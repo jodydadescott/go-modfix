@@ -57,10 +57,12 @@ func (x *file) init() {
 	x.paths = make(map[string]bool)
 
 	for _, v := range x.Replace {
-		x.DropReplace(v.Old.Path, v.Old.Version)
+		if v != nil && v.Syntax != nil {
+			x.DropReplace(v.Old.Path, v.Old.Version)
+		}
 	}
 
-	err := x.addMod(x)
+	err := x.addMod(x, true)
 	if err != nil {
 		x.err = err
 		return
@@ -92,7 +94,7 @@ func (x *file) init() {
 	}
 }
 
-func (x *file) addMod(mod *file) error {
+func (x *file) addMod(mod *file, recursion bool) error {
 
 	prepend := fmt.Sprintf("(%s) addMod(mod=%s)", x.Module.Mod.Path, mod.Module.Mod.Path)
 
@@ -125,22 +127,43 @@ func (x *file) addMod(mod *file) error {
 		addReplace(mod.Module.Mod.Path, relative)
 	}
 
+	if !recursion {
+		return nil
+	}
+
 	var errs *multierror.Error
 
-	for _, v := range mod.Require {
+	if x.AddAll {
 
-		child := x.goPath[v.Mod.Path]
-		if child == nil {
-			x.log("%s->%s not found", prepend, v.Mod.Path)
-			continue
+		x.log("%s->add all", prepend)
+
+		for _, v := range x.goPath {
+
+			err := x.addMod(v, false)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
 		}
+	} else {
 
-		x.log("%s->%s found", prepend, v.Mod.Path)
-		err := x.addMod(child)
-		if err != nil {
-			errs = multierror.Append(errs, err)
+		x.log("%s->add required only", prepend)
+
+		for _, v := range mod.Require {
+
+			child := x.goPath[v.Mod.Path]
+			if child == nil {
+				x.log("%s->%s not found", prepend, v.Mod.Path)
+				continue
+			}
+
+			x.log("%s->%s found", prepend, v.Mod.Path)
+			err := x.addMod(child, true)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
 		}
-
 	}
 
 	return errs.ErrorOrNil()
@@ -214,7 +237,9 @@ func (x *handle) init() (*Report, error) {
 	}
 
 	for _, v := range x.goPath {
-		r.GoPathFiles = append(r.GoPathFiles, v.report())
+		if x.Verbose {
+			r.GoPathFiles = append(r.GoPathFiles, v.report())
+		}
 	}
 
 	if errCount == 0 {
@@ -324,8 +349,8 @@ func (x *handle) readDir(directory string, inWorkPath bool) error {
 	return errs.ErrorOrNil()
 }
 
-func (handle *handle) log(format string, a ...any) {
-	if handle.Verbose {
+func (x *handle) log(format string, a ...any) {
+	if x.Debug {
 		fmt.Fprint(os.Stderr, fmt.Sprintf(format, a...)+"\n")
 	}
 }

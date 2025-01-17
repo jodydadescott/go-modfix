@@ -16,8 +16,10 @@ type Config struct {
 	WorkPath     string
 	Recursive    bool
 	EnableHidden bool
+	Debug        bool
 	Verbose      bool
 	DryRun       bool
+	AddAll       bool
 }
 
 // LoadFromEnv loads values for this structs attributes if present from the shell environment.
@@ -58,6 +60,15 @@ func (x *Config) LoadFromEnv() error {
 		}
 	}
 	{
+		v := os.Getenv("MODFIX_DEBUG")
+		if v != "" {
+			x.Debug, err = strconv.ParseBool(v)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+		}
+	}
+	{
 		v := os.Getenv("MODFIX_VERBOSE")
 		if v != "" {
 			x.Verbose, err = strconv.ParseBool(v)
@@ -70,6 +81,15 @@ func (x *Config) LoadFromEnv() error {
 		v := os.Getenv("MODFIX_DRYRUN")
 		if v != "" {
 			x.DryRun, err = strconv.ParseBool(v)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+		}
+	}
+	{
+		v := os.Getenv("MODFIX_ADD_ALL")
+		if v != "" {
+			x.AddAll, err = strconv.ParseBool(v)
 			if err != nil {
 				errs = multierror.Append(errs, err)
 			}
@@ -106,7 +126,7 @@ func (x *Report) Text() string {
 
 	sb := &strings.Builder{}
 
-	{
+	if x.GoPathFiles != nil {
 		flag := false
 		sb.WriteString(bar1)
 		sb.WriteString("GoPathFiles:\n")
@@ -119,10 +139,10 @@ func (x *Report) Text() string {
 			}
 			v.text("  ", sb)
 		}
-	}
 
-	sb.WriteString(bar1)
-	sb.WriteString("\n")
+		sb.WriteString(bar1)
+		sb.WriteString("\n")
+	}
 
 	{
 		flag := false
@@ -138,9 +158,9 @@ func (x *Report) Text() string {
 			}
 			v.text("  ", sb)
 		}
-	}
 
-	sb.WriteString(bar1)
+		sb.WriteString(bar1)
+	}
 
 	return sb.String()
 }
