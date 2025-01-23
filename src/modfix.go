@@ -121,6 +121,10 @@ func (x *file) addMod(mod *file, recursion bool) error {
 		panic(err)
 	}
 
+	if !strings.HasPrefix(relative, "../") {
+		relative = "./" + relative
+	}
+
 	if x == mod {
 		x.log("%s->not adding self", prepend)
 	} else {
